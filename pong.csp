@@ -1,0 +1,465 @@
+          	.EQU KBD_CNTL,  	$000
+          	.EQU KBD_STAT,  	$000
+          	.EQU KBD_DATA,  	$001
+          	.EQU KBD_FLUSH, 	$40
+          	.EQU TIM_CNTL,      	$030
+          	.EQU TIM_STAT,      	$030
+          	.EQU TIM_VALUE,     	$031
+          	.EQU TIM_COUNT,     	$034
+         
+          	.EQU INTERRUPT_ENA,           $80
+          	.EQU RESET_READY_BIT,         $40
+          	.EQU START_AFTER_LOAD,        $10
+          	.EQU ENABLE_RESET_AND_START,  $D0
+          	.EQU ENABLE_AND_RESET,        $C0
+
+          	.EQU CRT_BUFFER,    	$100
+          	.EQU BOTTOM_RIGHT,  	$313
+          	.EQU CRT_XREG,      	$314
+	.EQU CRT_YREG,      	$315
+          	.EQU CRT_CNTL,      	$316
+          	.EQU CRT_DATA,      	$317
+	.EQU CRT_ROWS,      	$0E
+          	.EQU CRT_COLS,      	$26
+          	.EQU CLEAR_DISPLAY, 	$01
+	.EQU HOME,		$04
+
+          	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
+          	.EQU GET_NUM,       	$E01
+          	.EQU PUT_STR,       	$E05
+          	.EQU PUT_NL,        	$E06
+          	.EQU PUT_NUM2,      	$E07
+          	.EQU PUT_CHR,       	$E08
+
+          	.EQU PADDLE_HEIGHT,	3
+          	.EQU MAX_PADDLE_Y,	11
+          	.EQU QUIT,		'x'
+	.EQU VERTICLE_LINE,	'|'
+	.EQU HORIZONTAL_LINE,	'-'
+	.EQU BALL_CHR,	'*'
+	.EQU NONE,		15
+	.EQU TOP,		0
+	.EQU BOTTOM,	13
+	.EQU LEFT,		0
+	.EQU RIGHT,		37
+ 	.EQU LEFT_UP, 	'w'
+          	.EQU LEFT_LEFT,	'a'
+          	.EQU LEFT_RIGHT,	'd'
+          	.EQU LEFT_DOWN,	's'
+          	.EQU RIGHT_UP,	3
+          	.EQU RIGHT_LEFT,	4
+          	.EQU RIGHT_RIGHT,	5
+          	.EQU RIGHT_DOWN,	2
+	.EQU PLAY_DELAY,	1 ; # of timer iterations before ball moves
+	.EQU WINNER_DELAY,	10; # of timer iterations while winner shown
+
+  	LDS#  	$E00
+  	CIE
+	psh#	ballX
+	psh#	ballY
+	psh#	leftY
+	psh#	rightY
+	psh#	deltaX
+	psh#	deltaY
+     	jsr 	startGame
+	ads#	6
+	LDA#	KEYISR
+        	STA 	$FF8
+      	LDA#	ENABLE_AND_RESET
+	OUTB 	KBD_CNTL
+          	LDA       	DELAY
+          	OUTW      	TIM_VALUE
+    	LDA#	TIMERISR
+	STA 	$FFB		; SET-UP TIMER ISR
+	LDA#	ENABLE_RESET_AND_START
+	OUTB 	TIM_CNTL         
+	SIE
+MAINLOOP:	NOP
+	JMP	MAINLOOP
+
+; void announce(int *winner)
+	.equ	announceWinner, 2
+announce:	bgn#	0
+	psha
+	lda#	0
+	sta	TIMER		; reset timer count
+	lda#	WINNER_DELAY	
+	sta	TIMER_CNT		; set to 5 second wait
+	lda#	3
+	outb	CRT_XREG
+	lda#	6	
+	outb	CRT_YREG
+	lda* !	announceWinner
+	cma#	RIGHT
+	jne	announce2
+	psh#	R_WINNER_LEN
+	psh#	R_WINNER
+	jmp	announce3
+announce2:	psh#	L_WINNER_LEN
+	psh#	L_WINNER
+announce3:	jsr	PUT_STR
+	ads#	2
+	lda#	NONE
+	sta* !	announceWinner
+	lda#	100
+	outb	CRT_YREG
+	popa
+	fin#	0
+	rtn	; announce()
+
+; int	getChar(int x, int y) places crt[y][x] in accumulator
+	.equ	getCharX, 4
+	.equ	getCharY, 3
+	.equ	getCharTemp, 0
+GetChar:	BGN#	1
+	lda !	getCharY
+	mul#	38
+	ada !	getCharX
+	ada#	CRT_BUFFER
+	sta !	getCharTemp
+	inb* !	getCharTemp
+	fin#	1
+	rtn	; GetChar()
+
+
+; void GetNewBallPosition(int *ballX, int *ballY, int *deltaX, int *deltaY)
+	.EQU	newPosBallX, 6
+	.equ	newPosBallY, 5
+	.equ	newPosDeltaX, 4
+	.equ	newPosDeltaY, 3
+	.equ	newPosTemp, 0
+NewPos:	Bgn#	1
+	psha
+	lda* !	newPosBallY
+	ada* !	newPosDeltaY
+	sta* !	newPosBallY
+	cma#	BOTTOM
+	jle	NewPos2	; if not beyond bottom
+	lda#	BOTTOM	
+	sta* ! 	newPosBallY
+	neg* !	newPosDeltaY ; reverse vertical direction	
+	jmp	NewPos3
+NewPos2:	cma#	0
+	jge	NewPos3	; if not above top
+	lda#	0	; put on top row
+	sta* !	newPosBallY
+	neg* !	newPosDeltaY ; reverse vertical direction
+NewPos3:	lda* !	newPosBallX
+	ada* !	newPosDeltaX
+	sta* !	newPosBallX
+	cma#	0
+	jne	NewPos4	; if not at lefmost position
+	psh* !	newPosBallX	; heading into leftmost position
+	psh* !	newPosBallY
+	jsr	getChar
+	ads#	2
+	cma#	'|'
+	jne	NewPos4 ; no paddle
+	lda#	1
+	sta* !	newPosBallX; put on second column
+	neg* !	newPosDeltaX; reverse horizontal direction
+	jmp	NewPos5
+NewPos4:	cma#	RIGHT
+	jne	NewPos5 ; if not at rightmost position
+	psh* !	newPosBallX	; heading into rightmost position
+	psh* !	newPosBallY
+	jsr	getChar
+	ads#	2
+	cma#	'|'	
+	jne	NewPos5 ; no paddle
+	lda#	RIGHT - 1
+	sta* !	newPosBallX; put on next to last column
+	neg* !	newPosDeltaX; reverse horizontal direction	
+NewPos5:	popa
+	fin#	1
+	rtn	; NewPos()
+
+
+; int random(int max) leaves result in accumulator!
+	.equ	randomMax, 2
+	
+random:	bgn#	0
+	lda	SEED
+	mul#	2779
+	ada#	1997
+	mod#	2048
+	sta	SEED
+	inc !	randomMax
+	mod !	randomMax
+	fin#	0
+	rtn
+	
+	
+; void startGame(int *ballX, int *ballY, int *LeftY, int *RightY, int *deltaX,
+;   int *deltaY)
+	.equ	startBallX, 7
+	.equ	startBallY, 6
+	.equ	startLeftY, 5
+	.equ	startRightY, 4
+	.equ	startDeltaX, 3
+	.equ	startDeltaY, 2
+startGame:  BGN#	0
+	PSHA
+	LDA#	PLAY_DELAY
+	STA	TIMER_CNT
+	LDA#	CLEAR_DISPLAY
+        	OUTB	CRT_CNTL	; CLEAR SCREEN
+	lda#	100
+	outB	CRT_YREG
+	lda#	RIGHT / 2
+	sta* !	startBallX
+	psh#	BOTTOM
+	jsr	random
+	ads#	1
+	sta* !	startBallY
+	psh#	1
+	jsr	random
+	mul#	2
+	nega
+	ada#	1
+	sta* !	startDeltaX
+	jsr	random	; reuses 1 on stack
+	ads#	1	; now get rid of 1 from stack
+	mul#	2
+	nega
+	ada#	1
+	sta* !	startDeltaY
+	lda#	BOTTOM / 2
+	sta* !	startLeftY
+	sta* !	startRightY
+  	psh#	RIGHT
+	psh* !	startRightY
+	psh#	'|'
+	jsr 	showPaddle
+	ads#	3
+	psh#	LEFT
+	psh* !	startLeftY
+	psh#	'|'
+	jsr	showPaddle
+	ads#	3
+	popa
+	fin#	0
+	RTN	; startGame()
+
+
+KEYISR:  	PSHA
+	lda#	0
+	outb	KBD_CNTL
+	INB 	KBD_DATA
+	CMA#	'x'
+	JNE	KEY1
+	HLT		; HALT IF 'x'
+KEY1:	cma#	$1B	; escape so cursor?
+	jne	key3	; jump if not escape
+	inb	kbd_data	; read second escaped key
+	cma#	$48	; if up cursor
+	jne	key2
+	lda#	RIGHT_UP	; set to RIGHT_UP
+	jmp	RIGHTKey
+KEY2:	cma#	$50	; if down cursor
+	jne	KeyDone
+	lda#	RIGHT_DOWN	; down cursor
+RIGHTKey:	psha
+	psh#	RightY
+	psh#	RIGHT
+	jsr	movePaddle
+	ads#	3
+	jmp	keydone		
+Key3:	cma#	LEFT_UP
+	jeq	LEFTKey	; LEFT_UP key so move the paddle
+	cma#	LEFT_DOWN
+	jne	keydone	; not a valid key so leave	
+LEFTKey:	psha
+	psh#	LeftY
+	psh#	LEFT
+	jsr	movePaddle
+	ads#	3
+Keydone:	lda#	INTERRUPT_ENA
+	outb	KBD_CNTL
+	POPA
+	IRTN
+	
+; void movePaddle(char key, int *y, int x)
+	.EQU	movePaddleKey, 4
+	.EQU	movePaddleY, 3
+	.EQU	movePaddleX, 2 
+movePaddle: bgn#	0
+	psha
+	pshx
+	psh !	movePaddleX
+	psh* !	movePaddleY
+	psh#	' '
+	jsr	showPaddle
+	ads#	3
+	cma#	RIGHT_UP
+	jeq	paddleUp
+	cma#	LEFT_UP
+	jne	padNotUp
+paddleUp:	lda* !	movePaddleY
+	cma#	TOP
+	jle	showPad	; cannot move up
+	dec* !	movePaddleY	; can move up
+	jmp	showPad
+padNotUp:	cma#	RIGHT_DOWN
+	jeq	padDown
+	cma#	LEFT_DOWN
+	jne	showPad
+padDown:	lda* !	movePaddleY	; either right down or left down
+	cma#	MAX_PADDLE_Y
+	jge	showPad	; already at bottom so do not inc y
+	inc* !	movePaddleY
+showPad:	psh !	movePaddleX
+	psh* !	movePaddleY
+	psh#	'|'
+	jsr	showPaddle
+	ads#	3
+	popa
+	popx
+	fin#	0
+	rtn	; movePaddle()
+
+
+; void showPaddle(int x, int y, char letter)
+	.EQU	showPaddleX, 4
+	.EQU	showPaddleY, 3
+	.EQU	showPaddleLetter, 2
+showPaddle: bgn# 	0
+	psha
+	pshx
+	ldx#	2
+	psh !	showPaddleX
+showPad1:	psh !	showPaddleY
+	psh !	showPaddleLetter
+	jsr	putChar
+	ads#	2
+	inc !	showPaddleY
+	soj	showPad1
+	ads#	1
+	popx
+	popa
+	fin# 	0
+	rtn	; showPaddle()
+
+
+; void putChar(int x, int y, char c)
+	.EQU	putCharX, 5
+	.EQU	putCharY, 4
+	.EQU	putCharC, 3
+	.EQU	putCharTemp, 0
+
+putChar:	bgn#	1
+	psha
+	lda !	putCharY
+	mul#	38
+	ada !	putCharX
+	ada#	CRT_BUFFER
+	sta !	putCharTemp
+	lda !	putCharC
+	outb* !	putCharTemp
+	popa
+	fin#	1
+	rtn
+
+TIMERISR: 	PSHA
+          	INC       	TIMER
+          	lda	Timer
+	cma	TIMER_CNT
+	jlt	TIMER_DONE
+	cma#	WINNER_DELAY
+	jne	Timer1
+	lda#	PLAY_DELAY	; set timer play since just announced winner
+	sta	TIMER_CNT		
+	psh#	ballX
+	psh#	ballY
+	psh#	leftY
+	psh#	rightY
+	psh#	deltaX
+	psh#	deltaY
+	jsr	startGame 
+	ads#	6	
+	jmp	TIMER3	; game just started now
+Timer1:	psh#	Winner
+	psh#	ballX
+	psh#	ballY
+	psh	leftY
+	psh	rightY
+	psh#	deltaX
+	psh#	deltaY
+	jsr	play
+	ads#	7	
+Timer3:	lda#	0
+	clr	Timer	; reset timer count
+TIMER_DONE: LDA#      ENABLE_AND_RESET
+          	OUTB      TIM_CNTL
+          	POPA
+          	IRTN		; END OF TIMERISR
+
+
+; void play (int *winner, int *ballX, int *ballY, int LeftY, int RightY, int *deltaX,
+ ;  int *deltaY)
+	.EQU	playWinner, 8
+	.EQU	playBallX, 7
+	.EQU	playBallY, 6
+	.EQU	playLeftY, 5
+	.EQU	playRightY, 4
+	.EQU	playDeltaX, 3
+	.EQU	playDeltaY, 2
+play:	bgn#	0
+	psha
+	psh* !	playBallX
+	psh* !	playBallY
+	psh#	' '
+	jsr	putChar
+	ads#	3
+	psh !	playBallX
+	psh !	playBallY
+	psh !	playDeltaX
+	psh !	playDeltaY
+	jsr	NewPos
+	ads#	4
+	lda* !	playBallX
+	cma#	0
+	jge	play2	; is ball not at -1
+	lda#	RIGHT	; ball left of left edge
+	sta* !	playWinner
+	psh  !	playWinner
+	jsr	announce
+	ads#	1
+	jmp	playDone
+play2:	cma#	RIGHT	; ball to right of right edge?
+	jle	play3
+	lda#	LEFT	; ball to right of right edge
+	sta* !	playWinner
+	psh !	playWinner
+	jsr 	announce
+	ads#	1
+	jmp	playDone
+play3:	psh* !	playBallX
+	psh* !	playBallY
+	psh#	'*'
+	jsr	putChar
+	ads#	3
+playDone:	popa
+	fin#	0
+	rtn	; play()
+
+TIMER_CNT:	.WORD	PLAY_DELAY
+
+WINNER:	.WORD	NONE
+LEFTY: 	.WORD	
+RIGHTY:	.WORD
+BALLX:	.WORD	
+BALLY:	.WORD	
+SEED:	.WORD	0
+DELTAX:	.WORD	
+DELTAY:	.WORD	
+KEY:	.WORD	
+DELAY:    	.WORD     	200000
+TIMER:	.WORD 	0
+MINUS1:	.WORD	-1
+MINUS2:	.WORD	-2
+L_WINNER:	.CHAR	'The winner is the Left Player!', L_WINNER_LEN
+R_WINNER:	.CHAR	'The winner is the Right Player!', R_WINNER_LEN
+
+
+
