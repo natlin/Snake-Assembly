@@ -1,60 +1,61 @@
-than Lin, Matthew Yap
+;Authors Nathan Lin, Matthew Yap
 
-LDS# $e00 
-.EQU KBD_CNTL,  	$000
-          	.EQU KBD_STAT,  	$000
-          	.EQU KBD_DATA,  	$001
-          	.EQU KBD_FLUSH, 	$40
-          	.EQU TIM_CNTL,      	$030
-          	.EQU TIM_STAT,      	$030
-          	.EQU TIM_VALUE,     	$031
-          	.EQU TIM_COUNT,     	$034
+  LDS# $e00 
+  .EQU KBD_CNTL, $000
+  .EQU KBD_STAT, $000
+  .EQU KBD_DATA, $001
+  .EQU KBD_FLUSH, $40
+  .EQU TIM_CNTL, $030
+  .EQU TIM_STAT, $030
+  .EQU TIM_RELOAD, $031
+  .EQU TIM_COUNT, $034
          
-          	.EQU INTERRUPT_ENA,           $80
-          	.EQU RESET_READY_BIT,         $40
-          	.EQU START_AFTER_LOAD,        $10
-          	.EQU ENABLE_RESET_AND_START,  $D0
-          	.EQU ENABLE_AND_RESET,        $C0
+  .EQU INTERRUPT_ENA, $80
+  .EQU RESET_READY_BIT, $40
+  .EQU START_AFTER_LOAD, $10
+  .EQU ENABLE_RESET_AND_START, $D0
+  .EQU ENABLE_AND_RESET, $C0
 
-          	.EQU CRT_BUFFER,    	$100
-          	.EQU BOTTOM_RIGHT,  	$313
-          	.EQU CRT_XREG,      	$314
-	.EQU CRT_YREG,      	$315
-          	.EQU CRT_CNTL,      	$316
-          	.EQU CRT_DATA,      	$317
-	.EQU CRT_ROWS,      	$0E
-          	.EQU CRT_COLS,      	$26
-          	.EQU CLEAR_DISPLAY, 	$01
-	.EQU HOME,		$04
+  .EQU CRT_BUFFER, $100
+  .EQU BOTTOM_RIGHT, $313
+  .EQU CRT_XREG, $314
+  .EQU CRT_YREG, $315
+  .EQU CRT_CNTL, $316
+  .EQU CRT_DATA, $317
+  .EQU CRT_ROWS, $0E
+  .EQU CRT_COLS, $26
+  .EQU CLEAR_DISPLAY, $01
+  .EQU HOME, $04
 
-          	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
-          	.EQU GET_NUM,       	$E01
-          	.EQU PUT_STR,       	$E05
-          	.EQU PUT_NL,        	$E06
-          	.EQU PUT_NUM2,      	$E07
-          	.EQU PUT_CHR,       	$E08
-	.EQU TOP, 0
-	.EQU BOTTOM, 	13
-	.EQU MAX_RIGHT,	 37
-	.EQU MIN_RIGHT, 	1
-	.EQU DOWN, 	2
-	.EQU UP, 3
-	.EQU LEFT, 4
-	.EQU RIGHT, 5
-	.EQU MAX, 33
-	.EQU Q_SIZE, 600
-	.EQU PLAY_DELAY, 2500
-	.EQU SCORE_DELAY, 50000
-	.EQU COUNTDOWN_DELAY, 10000
+  .EQU PUT_NUM, $E00      ; MINI_OS JSRS
+  .EQU GET_NUM, $E01
+  .EQU PUT_STR, $E05
+  .EQU PUT_NL, $E06
+  .EQU PUT_NUM2, $E07
+  .EQU PUT_CHR, $E08
+
+  .EQU TOP, 1
+  .EQU BOTTOM, 14
+  .EQU MAX_RIGHT, 38
+  .EQU MIN_RIGHT, 1
+  .EQU DOWN, 2
+  .EQU UP, 3
+  .EQU LEFT, 4
+  .EQU RIGHT, 5
+  .EQU MAX, 33
+  .EQU Q_SIZE, 600
+  .EQU PLAY_DELAY, 2500
+  .EQU SCORE_DELAY, 50000
+  .EQU COUNTDOWN_DELAY, 10000
 
         ;putchar test
 
-PSH# 10
-PSH# 5
-PSH# 'A'
-JSR putChar
-ADS# 3
-HLT
+  PSH# 10
+  PSH# 5
+  PSH# 'A'
+  JSR putChar
+  ADS# 3
+  HLT
 
 
 advanceTime:
@@ -63,25 +64,23 @@ getKey:
 
 moveSnake:
 
-	
+  .EQU  putCharX, 5
+  .EQU  putCharY, 4
+  .EQU  putCharC, 3
+  .EQU  putCharTemp, 0
 
-	.EQU	putCharX, 5
-	.EQU	putCharY, 4
-	.EQU	putCharC, 3
-	.EQU	putCharTemp, 0
-
-putChar:	bgn#	1
-	psha
-	lda !	putCharY
-	mul#	38
-	ada !	putCharX
-	ada#	CRT_BUFFER
-	sta !	putCharTemp
-	lda !	putCharC
-	outb* !putCharTemp
-	popa
-	fin#	1
-	rtn
+putChar:  bgn#  1
+  psha
+  lda ! putCharY
+  mul#  38
+  ada ! putCharX
+  ada#  CRT_BUFFER
+  sta ! putCharTemp
+  lda ! putCharC
+  outb* !putCharTemp
+  popa
+  fin#  1
+  rtn
 
 
 random2:
@@ -99,5 +98,5 @@ startSnake:
 QUIT: .CHAR 'x', QUITLEN
 ;NOKKEY: .CHAR '\n', NOKKEYLEN
 BODY: .CHAR 'O', BODYLEN
-NO_BODY: .CHAR ' ', NO_BODYLEN
+NO_BODY:  .CHAR ' ', NO_BODYLEN
 FOOD: .CHAR 'F', FOODLEN
