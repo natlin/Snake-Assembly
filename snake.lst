@@ -1,0 +1,282 @@
+LINE ADDR CONTENTS SOURCE LINE
+  1.              ;Authors Nathan Lin, Matthew Yap
+  2.              
+  3.              	.EQU KBD_CNTL, $000
+  4.              	.EQU KBD_STAT, $000
+  5.              	.EQU KBD_DATA, $001
+  6.              	.EQU KBD_FLUSH, $40
+  7.              	.EQU TIM_CNTL, $030
+  8.              	.EQU TIM_STAT, $030
+  9.              	.EQU TIM_RELOAD, $031
+ 10.              	.EQU TIM_COUNT, $034
+ 11.                       
+ 12.              	.EQU INTERRUPT_ENA, $80
+ 13.              	.EQU RESET_READY_BIT, $40
+ 14.              	.EQU START_AFTER_LOAD, $10
+ 15.              	.EQU ENABLE_RESET_AND_START, $D0
+ 16.              	.EQU ENABLE_AND_RESET, $C0
+ 17.              
+ 18.              	.EQU CRT_BUFFER, $100
+ 19.              	.EQU BOTTOM_RIGHT, $313
+ 20.              	.EQU CRT_XREG, $314
+ 21.              	.EQU CRT_YREG, $315
+ 22.              	.EQU CRT_CNTL, $316
+ 23.              	.EQU CRT_DATA, $317
+ 24.              	.EQU CRT_ROWS, $0E
+ 25.              	.EQU CRT_COLS, $26
+ 26.              	.EQU CLEAR_DISPLAY, $01
+ 27.              	.EQU HOME, $04
+ 28.              
+ 29.              	.EQU PUT_NUM, $E00      ; MINI_OS JSRS
+ 30.              	.EQU GET_NUM, $E01
+ 31.              	.EQU PUT_STR, $E05
+ 32.              	.EQU PUT_NL, $E06
+ 33.              	.EQU PUT_NUM2, $E07
+ 34.              	.EQU PUT_CHR, $E08
+ 35.              
+ 36.              	.EQU TOP, 0
+ 37.              	.EQU BOTTOM, 13
+ 38.              	.EQU MAX_RIGHT, 37
+ 39.              	.EQU MIN_RIGHT, 1
+ 40.              	.EQU DOWN, 2
+ 41.              	.EQU UP, 3
+ 42.              	.EQU LEFT, 4
+ 43.              	.EQU RIGHT, 5
+ 44.              	.EQU MAX, 33
+ 45.              	.EQU Q_SIZE, 600
+ 46.              	.EQU PLAY_DELAY, 2500
+ 47.              	.EQU SCORE_DELAY, 50000
+ 48.              	.EQU COUNTDOWN_DELAY, 10000
+ 49.              
+ 50.                      ;putchar test
+ 51.              
+ 52.              	;PSH# 10
+ 53.              	;PSH# 5
+ 54.              	;PSH# 'A'
+ 55.              	;JSR putChar
+ 56.              	;ADS# 3
+ 57.              	;HLT
+ 58.              
+ 59.  000 020E00  MAIN:	LDS# $e00
+ 60.              	;PSH# SPEEDPROMPT_LEN
+ 61.              	;PSH# SPEEDPROMPT
+ 62.              	;JSR PUT_STR
+ 63.              	;ADS# 2
+ 64.              	;JSR GET_NUM
+ 65.              	;MUL# 5000
+ 66.              	;STA SPEED
+ 67.  001 080004  	PSH# SEEDPROMPT_LEN
+ 68.  002 080086  	PSH# SEEDPROMPT
+ 69.  003 412E05  	JSR PUT_STR
+ 70.  004 120002  	ADS# 2
+ 71.  005 412E01  	JSR GET_NUM
+ 72.  006 042089  	STA SEED
+ 73.              	;PSH SEED
+ 74.              	;JSR RANDOM	;Puts seed in srand, a C++ function. write our own srand?
+ 75.              	;ADS# 1
+ 76.  007 412014  	JSR SHOWINTRO	;explains options and clears screen
+ 77.              	
+ 78.              
+ 79.              
+ 80.              advanceTime:
+ 81.              
+ 82.              getKey:
+ 83.              
+ 84.              moveSnake:
+ 85.              
+ 86.              	.EQU	putCharX, 5
+ 87.              	.EQU	putCharY, 4
+ 88.              	.EQU	putCharC, 3
+ 89.              	.EQU	putCharTemp, 0
+ 90.              
+ 91.  008 680001  putChar:	bgn#	1
+ 92.  009 FFF010  	psha
+ 93.  00A 003004  	lda !	putCharY
+ 94.  00B 180026  	mul#	38
+ 95.  00C 103005  	ada !	putCharX
+ 96.  00D 100100  	ada#	CRT_BUFFER
+ 97.  00E 043000  	sta !	putCharTemp
+ 98.  00F 003003  	lda !	putCharC
+ 99.  010 717000  	outb* !putCharTemp
+100.  011 FFF013  	popa
+101.  012 690001  	fin#	1
+102.  013 FFF040  	rtn
+103.              
+104.              
+105.              random2:
+106.              
+107.  014 000001  showIntro:	lda# clear_display
+108.  015 712316  	outb crt_cntl	; clear display
+109.  016 080116  	psh# intro1len
+110.  017 08001D  	psh# intro1
+111.  018 412E05  	jsr put_str
+112.  019 120002  	ads# 2
+113.              
+114.              	;write interrupt to read a key to clear screen and go to countdown
+115.  01A FFF040  	RTN
+116.  01B 000001  	lda# clear_display
+117.  01C 712316  	outb crt_cntl
+118.              
+119.              
+120.              showScore:
+121.              
+122.              startNewScreen:
+123.              
+124.              startSnake:
+125.              
+126.              
+127.              ;char stuff?
+128.  01D 534E41  INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\CR\LF Head is diff character (5pt)\CR\LF Space Bar pauses (5pt)\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration (5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF Choose Characters of Snake(5pt)\CR\LF High Score (5pt)\CR\LF Save and Load game (5pt)', INTRO1LEN
+      01E 4B453A
+      01F 202841
+      020 534349
+      021 492061
+      022 72743F
+      023 29200D
+      024 0A204F
+      025 505449
+      026 4F4E53
+      027 3A0D0A
+      028 204865
+      029 616420
+      02A 697320
+      02B 646966
+      02C 662063
+      02D 686172
+      02E 616374
+      02F 657220
+      030 283570
+      031 74290D
+      032 0A2053
+      033 706163
+      034 652042
+      035 617220
+      036 706175
+      037 736573
+      038 202835
+      039 707429
+      03A 0D0A20
+      03B 496E63
+      03C 726561
+      03D 73652F
+      03E 446563
+      03F 726561
+      040 736520
+      041 537065
+      042 65640D
+      043 0A206F
+      044 662053
+      045 6E616B
+      046 652042
+      047 757474
+      048 6F6E20
+      049 283570
+      04A 74290D
+      04B 0A5370
+      04C 656564
+      04D 206261
+      04E 736564
+      04F 206F6E
+      050 206475
+      051 726174
+      052 696F6E
+      053 202835
+      054 707429
+      055 0D0A20
+      056 486F72
+      057 697A6F
+      058 6E7461
+      059 6C2057
+      05A 726170
+      05B 2D6172
+      05C 6F756E
+      05D 642835
+      05E 707429
+      05F 0D0A20
+      060 43686F
+      061 6F7365
+      062 204368
+      063 617261
+      064 637465
+      065 727320
+      066 6F6620
+      067 536E61
+      068 6B6528
+      069 357074
+      06A 290D0A
+      06B 204869
+      06C 676820
+      06D 53636F
+      06E 726520
+      06F 283570
+      070 74290D
+      071 0A2053
+      072 617665
+      073 20616E
+      074 64204C
+      075 6F6164
+      076 206761
+      077 6D6520
+      078 283570
+      079 742920
+      07A 537065
+      07B 656420
+      07C 666F72
+      07D 206465
+      07E 6D6F20
+      07F 283120
+      080 3D2066
+      081 617374
+      082 2C2039
+      083 203D20
+      084 736C6F
+      085 772920
+      086 536565
+129.  07A 537065  SPEEDPROMPT:	.CHAR 'Speed for demo (1 = fast, 9 = slow)', SPEEDPROMPT_LEN
+      07B 656420
+      07C 666F72
+      07D 206465
+      07E 6D6F20
+      07F 283120
+      080 3D2066
+      081 617374
+      082 2C2039
+      083 203D20
+      084 736C6F
+      085 772920
+130.  086 536565  SEEDPROMPT:	.CHAR 'Seed', SEEDPROMPT_LEN
+      087 642020
+131.  088 000000  SPEED:	.word
+132.  089 000000  SEED:	.word
+133.  08A 782020  QUIT:	.CHAR 'x', QUITLEN
+134.              ;NOKKEY: .CHAR '\n', NOKKEYLEN
+135.  08B 4F2020  BODY:	.CHAR 'O', BODYLEN
+136.  08C 202020  NO_BODY:	.CHAR ' ', NO_BODYLEN
+137.  08D 462020  FOOD:	.CHAR 'F', FOODLEN
+
+                     SYMBOL TABLE CONTENTS
+
+000008 = ADVANCETIME     00008B = BODY            000001 = BODYLEN         
+00000D = BOTTOM          000313 = BOTTOM_RIGHT    000001 = CLEAR_DISPLAY   
+002710 = COUNTDOWN_DELAY 000100 = CRT_BUFFER      000316 = CRT_CNTL        
+000026 = CRT_COLS        000317 = CRT_DATA        00000E = CRT_ROWS        
+000314 = CRT_XREG        000315 = CRT_YREG        000002 = DOWN            
+0000C0 = ENABLE_AND_RESET0000D0 = ENABLE_RESET_AND_START00008D = FOOD            
+000001 = FOODLEN         000008 = GETKEY          000E01 = GET_NUM         
+000004 = HOME            000080 = INTERRUPT_ENA   00001D = INTRO1          
+000116 = INTRO1LEN       000000 = KBD_CNTL        000001 = KBD_DATA        
+000040 = KBD_FLUSH       000000 = KBD_STAT        000004 = LEFT            
+000000 = MAIN            000021 = MAX             000025 = MAX_RIGHT       
+000001 = MIN_RIGHT       000008 = MOVESNAKE       00008C = NO_BODY         
+000001 = NO_BODYLEN      0009C4 = PLAY_DELAY      000008 = PUTCHAR         
+000003 = PUTCHARC        000000 = PUTCHARTEMP     000005 = PUTCHARX        
+000004 = PUTCHARY        000E08 = PUT_CHR         000E06 = PUT_NL          
+000E00 = PUT_NUM         000E07 = PUT_NUM2        000E05 = PUT_STR         
+00008A = QUIT            000001 = QUITLEN         000258 = Q_SIZE          
+000014 = RANDOM2         000040 = RESET_READY_BIT 000005 = RIGHT           
+00C350 = SCORE_DELAY     000089 = SEED            000086 = SEEDPROMPT      
+000004 = SEEDPROMPT_LEN  000014 = SHOWINTRO       00001D = SHOWSCORE       
+000088 = SPEED           00007A = SPEEDPROMPT     000023 = SPEEDPROMPT_LEN 
+00001D = STARTNEWSCREEN  00001D = STARTSNAKE      000010 = START_AFTER_LOAD
+000030 = TIM_CNTL        000034 = TIM_COUNT       000031 = TIM_RELOAD      
+000030 = TIM_STAT        000000 = TOP             000003 = UP              
