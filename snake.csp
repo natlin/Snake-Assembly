@@ -49,8 +49,8 @@
 
         ;putchar test
 
-	;PSH# 10
-	;PSH# 5
+	;PSH# 0
+	;PSH# 0
 	;PSH# 'A'
 	;JSR putChar
 	;ADS# 3
@@ -148,12 +148,11 @@ showIntro1:	inb KBD_Stat
 
 showScore:	BGN# 0
 		psha
-		pshx
 		lda ! lives1
 		cma# 0
 		JEQ GameOver
 		cma# 3
-		JGE showScoreTest
+		JEQ showScoreTest
 		JMP ShowScoreText
 showScoretest:		lda ! score1
 		cma# 0
@@ -181,7 +180,6 @@ showScoreText:	lda# 15
 		JSR PUT_NUM
 
 showScoreEnd:	popa
-		popx
 		FIN# 0
 		rtn
 
