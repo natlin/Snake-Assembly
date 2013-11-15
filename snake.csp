@@ -74,7 +74,26 @@ MAIN:	LDS# $e00
 	;JSR RANDOM	;Puts seed in srand, a C++ function. write our own srand?
 	;ADS# 1
 	JSR SHOWINTRO	;explains options and clears screen
-	
+	lda# clear_display
+	outb crt_cntl
+	psh score
+	psh lives
+	jsr showScore
+	ADS# 2
+	HLT
+	;LDA SCORE_DELAY	;Score_Delay is too large to fit in ACC with an opcode?
+	;outw Tim_Reload
+	;LDA# keyISR
+	;STA $FF8
+	;LDA# Enable_and_reset
+	;OUTB kbd_cntl
+	;LDA# TimerISR
+	;STA $FFB
+	;LDA# Enable_reset_and_start
+	;outb tim_cntl
+	;SIE
+;MainLOOP:	NOP
+;	JMP MainLOOP
 
 
 advanceTime:
@@ -104,20 +123,73 @@ putChar:	bgn#	1
 
 random2:
 
-showIntro:	lda# clear_display
+showIntro:	BGN# 0
+	psha
+	lda# clear_display
 	outb crt_cntl	; clear display
 	psh# intro1len
 	psh# intro1
 	jsr put_str
 	ads# 2
-
+showIntro1:	inb KBD_Stat
+	cma# $80	;ready bit set?
+	JLT showIntro1
+	inb KBD_Data
+	cma# '\CR'
+	JNE showIntro1
+	popa
+	FIN# 0
 	;write interrupt to read a key to clear screen and go to countdown
 	RTN
-	lda# clear_display
-	outb crt_cntl
 
 
-showScore:
+	.equ score1, 3
+	.equ lives1, 2
+
+showScore:	BGN# 0
+		psha
+		pshx
+		lda ! lives1
+		cma# 0
+		JEQ GameOver
+		cma# 3
+		JGE showScoreTest
+		JMP ShowScoreText
+showScoretest:		lda ! score1
+		cma# 0
+		JEQ showScoreEnd
+
+showScoreText:	lda# 15
+		outb crt_xreg
+		lda# 1
+		outb crt_yreg
+		psh# ScoreText_Len
+		psh# ScoreText
+		JSR Put_Str
+		ads# 2
+		LDA Score
+		JSR PUT_NUM
+		lda# 15
+		outb crt_xreg
+		lda# 2
+		outb crt_yreg
+		psh# LivesText_Len
+		psh# LivesText
+		JSR Put_str
+		ADS# 2
+		LDA Lives
+		JSR PUT_NUM
+
+showScoreEnd:	popa
+		popx
+		FIN# 0
+		rtn
+
+GameOver:	psh# Gameov_Len
+	psh# Gameov
+	JSR Put_str
+	ads# 2
+	JMP showScoreEnd
 
 startNewScreen:
 
@@ -125,13 +197,23 @@ startSnake:
 
 
 ;char stuff?
-INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\CR\LF Head is diff character (5pt)\CR\LF Space Bar pauses (5pt)\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration (5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF Choose Characters of Snake(5pt)\CR\LF High Score (5pt)\CR\LF Save and Load game (5pt)', INTRO1LEN
+INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\CR\LF Head is diff character (5pt)\CR\LF Space Bar pauses (5pt)\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration (5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF Choose Characters of Snake(5pt)\CR\LF High Score (5pt)\CR\LF Save and Load game (5pt)\CR\LF Press Enter to Continue...', INTRO1LEN
 SPEEDPROMPT:	.CHAR 'Speed for demo (1 = fast, 9 = slow)', SPEEDPROMPT_LEN
 SEEDPROMPT:	.CHAR 'Seed', SEEDPROMPT_LEN
 SPEED:	.word
 SEED:	.word
+Gameov:	.CHAR '          Game Over', Gameov_Len
 QUIT:	.CHAR 'x', QUITLEN
 ;NOKKEY: .CHAR '\n', NOKKEYLEN
 BODY:	.CHAR 'O', BODYLEN
 NO_BODY:	.CHAR ' ', NO_BODYLEN
 FOOD:	.CHAR 'F', FOODLEN
+Score:	.word 0
+ScoreText:	.char 'Score: ', ScoreText_Len
+lives:	.word 3
+LivesText:	.char 'Lives: ', LivesText_Len
+direction:	.word
+delay:	.word
+head:	.word
+tail:	.word
+Q:	.blkw Q_SIZE, 0
