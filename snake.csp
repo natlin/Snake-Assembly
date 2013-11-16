@@ -80,23 +80,70 @@ MAIN:	LDS# $e00
 	psh lives
 	jsr showScore
 	ADS# 2
-	HLT
-	;LDA SCORE_DELAY	;Score_Delay is too large to fit in ACC with an opcode?
-	;outw Tim_Reload
-	;LDA# keyISR
-	;STA $FF8
-	;LDA# Enable_and_reset
-	;OUTB kbd_cntl
-	;LDA# TimerISR
-	;STA $FFB
-	;LDA# Enable_reset_and_start
-	;outb tim_cntl
-	;SIE
-;MainLOOP:	NOP
-;	JMP MainLOOP
+	LDA ScoreDelay
+	outw Tim_Reload
+	LDA# keyISR
+	STA $FF8
+	LDA# Enable_and_reset
+	OUTB kbd_cntl
+	LDA# TimerISR
+	STA $FFB
+	LDA# Enable_reset_and_start
+	outb tim_cntl
+	SIE
+MainLOOP:	NOP
+	JMP MainLOOP
+
+MainLOOPEnd:	HLT
 
 
 advanceTime:
+
+keyISR:	PSHA
+	lda#	0
+	outb	KBD_CNTL
+	INB 	KBD_DATA
+	CMA# ' '
+	JEQ	PAUSE
+	CMA#	'x'
+	JNE	KEY1
+
+	HLT		;HALT if X
+
+PAUSE:	;display pause screen text
+PAUSE2:	inb KBD_Stat
+	cma# $80
+	JLT PAUSE2
+	inb KBD_Data
+	cma# ' '
+	JNE PAUSE2
+	;return to game
+
+KEY1:	cma# $1B
+	JNE KeyDone
+	inb kbd_data
+	cma# $48
+	JNE key2
+	lda# UP
+	jmp rightKey
+KEY2:	cma# $50
+	jne Key3
+	lda# Down
+	JMP rightKEY
+KEY3:	cma# $4B;
+	JNE KEY4
+	LDA# left
+	JMP RIGHTKEY
+KEY4:	cma# $4D
+	JNE KEYDone
+	lda# right
+	JMP RIGHTKEY
+RIGHTKey:	
+
+KEYDone:	lda# Interrupt_ENA
+	outb KBD_CNTL
+	POPA
+	IRTN
 
 getKey:
 
@@ -120,8 +167,22 @@ putChar:	bgn#	1
 	fin#	1
 	rtn
 
+TimerISR:	PSHA
+TimLoop3:	INB Tim_Stat
+	JGE TimLoop3
+	lda# Reset_Ready_Bit
+	OUTB Tim_Cntl
+	PSH# 19
+	PSH# 0
+	PSH# '3'
+	JSR putchar
+	ads# 3
+	JMP TimLoop2
+TimLoop2:
+TimLoop1:
+TimLoop0:
 
-random2:
+random2:	
 
 showIntro:	BGN# 0
 	psha
@@ -203,6 +264,8 @@ SEED:	.word
 Gameov:	.CHAR '          Game Over', Gameov_Len
 QUIT:	.CHAR 'x', QUITLEN
 ;NOKKEY: .CHAR '\n', NOKKEYLEN
+KBD_Val:	.word	;direction of snake/other keyboard interrupt values
+ScoreDelay:	.word SCORE_DELAY
 BODY:	.CHAR 'O', BODYLEN
 NO_BODY:	.CHAR ' ', NO_BODYLEN
 FOOD:	.CHAR 'F', FOODLEN
