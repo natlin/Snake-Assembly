@@ -115,14 +115,14 @@ COUNTDOWN1:	INB TIM_STAT
 	LDA# 1
 	outb CRT_yreg
 	LDA ! COUNTTIME
-	JSR PUT_NUM
-	LDA# 0
-	outb crt_xreg
-	outb crt_yreg
+	JSR PUT_NUM2
 	SBA# 1
 	CMA# 0
 	JLT COUNTDOWNDONE
 	STA ! COUNTTIME
+	LDA# 0
+	outb CRT_xreg
+	outb CRT_yreg
 	JMP COUNTDOWN1
 COUNTDOWNDONE:	FIN# 1
 	RTN
@@ -150,6 +150,7 @@ PAUSE:	lda# 17
 	ADS# 2;display pause screen text
 	lda# 0
 	outb crt_xreg
+	lda# 0
 	outb crt_yreg
 PAUSE2:	inb KBD_Stat
 	cma# $80
