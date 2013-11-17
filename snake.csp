@@ -43,8 +43,8 @@
 	.EQU RIGHT, 5
 	.EQU MAX, 33
 	.EQU Q_SIZE, 600
-	.EQU PLAY_DELAY, 2500
-	.EQU SCORE_DELAY, 5000
+	.EQU PLAY_DELAY, 5000
+	.EQU SCORE_DELAY, 50000
 	.EQU COUNTDOWN_DELAY, 10000
 
         ;putchar test
@@ -84,9 +84,8 @@ MAIN:	LDS# $e00
 	STA $FF8
 	LDA# Enable_and_reset
 	OUTB kbd_cntl
-	LDA SCOREDELAY
+	LDA COUNTDOWNTIME
 	outw Tim_Reload
-	JSR COUNTDOWN
 	LDA# TimerISR
 	STA $FFB
 	LDA# Enable_reset_and_start
@@ -94,8 +93,7 @@ MAIN:	LDS# $e00
 	SIE
 MainLOOP:	NOP
 	JMP MainLOOP
-
-MainLOOPEnd:	HLT
+;MainLOOPEnd:	HLT
 
 	.equ COUNTTIME, 0
 COUNTDOWN:	BGN# 1
@@ -110,12 +108,14 @@ COUNTDOWN1:	INB TIM_STAT
 	OUTB TIM_CNTL
 	LDA# CLEAR_DISPLAY
 	OUTB CRT_CNTL
-	LDA# 19
-	outb crt_xreg
-	LDA# 1
-	outb CRT_yreg
+	;LDA# 19
+	;outb crt_xreg
+	;LDA# 1
+	;outb CRT_yreg
 	LDA ! COUNTTIME
-	JSR PUT_NUM2
+	ada# '0'
+	outb $113
+	SBA# '0'
 	SBA# 1
 	CMA# 0
 	JLT COUNTDOWNDONE
@@ -124,20 +124,21 @@ COUNTDOWN1:	INB TIM_STAT
 	outb CRT_xreg
 	outb CRT_yreg
 	JMP COUNTDOWN1
-COUNTDOWNDONE:	FIN# 1
+COUNTDOWNDONE:	LDA# 2
+	STA STAGE
+	FIN# 1
 	RTN
 
 ;advanceTime:
 
 keyISR:	PSHA
-	lda#	0
-	outb	KBD_CNTL
+	;lda#	0
+	;outb	KBD_CNTL
 	INB 	KBD_DATA
 	CMA# ' '
 	JEQ	PAUSE
 	CMA#	'x'
 	JNE	KEY1
-
 	HLT		;HALT if X
 
 PAUSE:	lda# 17
@@ -179,16 +180,44 @@ KEY4:	cma# $4D
 	JNE KEYDone
 	lda# right
 	JMP RIGHTKEY
-RIGHTKey:	
-
-KEYDone:	lda# Interrupt_ENA
-	outb KBD_CNTL
+RIGHTKey:	STA direction
+KEYDone:	;lda# Interrupt_ENA
+	;outb KBD_CNTL
 	POPA
 	IRTN
 
 ;getKey:
+	.equ direct, 8
+	.equ scoresCnt, 7
+	.equ livesCnt, 6
+	.equ seedNum, 5
+	.equ snake, 4
+	.equ headptr, 3
+	.equ tailptr, 2
 
-moveSnake:
+moveSnake:	BGN# 0
+	
+mvSnakeU:	lda ! headPtr
+	SBA# 38
+	STA ! headPtr
+	JMP mvSnakeCont
+mvSnakeD:	lda ! headPtr
+	ADA# 38
+	STA ! headPtr
+	JMP mvSnakeCont
+mvSnakeL:	lda ! headPtr
+	SBA# 1
+	STA ! headPtr
+	JMP mvSnakeCont
+mvSnakeR:	lda ! headPtr
+	ADA# 1
+	STA ! headPtr
+	JMP mvSnakeCont
+mvSnakeCont:	LDA# 1
+	JSR PUT_NUM
+	FIN# 0
+	RTN
+
 
 	.EQU	putCharX, 5
 	.EQU	putCharY, 4
@@ -215,9 +244,16 @@ putChar:	bgn#	1
 TimerISR:	PSHA
 	PSHX
 	LDA STAGE
+	CMA# 1
+	JEQ TimCNTDWN
 	CMA# 2
-	JEQ COUNTDOWN
-;COUNTDOWN:	LDA CDCOUNT
+	JEQ TimStartSnake
+	;CMA# 3
+	;JEQ TimMOVE
+	JMP TimDone
+TimCNTDWN:	JSR COUNTDOWN
+	JMP TimDone
+;	LDA CDCOUNT
 ;	CMA# neg_one
 ;	JNE COUNTDOWNTXT
 ;	JMP STARTSNAKE
@@ -235,8 +271,20 @@ TimerISR:	PSHA
 ;	ads# 3
 ;	JMP TimLoop2
 ;TimLoop2:
+TimStartSnake:	JSR StartSnake
+	INC STAGE
+	JMP TimDone
 ;TimLoop1:
 ;TimLoop0:
+TIMMove:	psh direction	; pushes direction
+	psh# score
+	psh# lives
+	psh# seed
+	psh# Q
+	psh# head
+	psh# tail
+	JSR moveSnake
+	ads# 7
 
 TimDone:	LDA# Enable_reset_and_start
 	OUTB TIM_CNTL
@@ -247,17 +295,16 @@ TimDone:	LDA# Enable_reset_and_start
 
 	.equ seedVal, 3
 	.equ maxVal, 2
-	.equ randTemp, 0
-random2:	BGN# 1
-	LDA ! maxVal
-	ADA# 1
-	STA ! randTemp
-	lda ! seedVal
+random2:	BGN# 0
+	lda* ! seedVal
 	MUL# 2789
 	ADA# 1997
-	DIV# 2048
-	DIV ! randTemp
-	FIN# 1
+	MOD# 2048
+	STA* !seedVal
+	INC ! maxVal
+	MOD ! maxVal
+	
+	FIN# 0
 	RTN	; random number is stored in ACC to return
 
 showIntro:	BGN# 0
@@ -319,6 +366,8 @@ showScoreText:	lda# 15
 showScoreEnd:	;JSR COUNTDOWN
 	;LDA# 3
 	;STA CDCOUNT
+	LDA# 1
+	STA STAGE
 	popa
 		FIN# 0
 		rtn
@@ -352,9 +401,190 @@ GameOver:	lda# 15
 	HLT
 	JMP showScoreEnd
 
-startNewScreen:
+;startNewScreen:
+;	.equ xx, 4
+;	.equ yy, 3
+;	.equ cc, 2
+;PUTCHAR2:	BGN# 0
+;	LDA ! xx
+;	outb crt_xreg
+;	LDA ! yy
+;	outb crt_yreg
+;	LDA ! cc
+;	outb CRT_DATA
+;	LDA# 0
+;	outb crt_xreg
+;	outb crt_yreg
+;	FIN# 0
+;	RTN
 
-startSnake:
+
+	.equ y2temp, 5
+	.equ x2temp, 4
+	.equ loc, 3
+	.equ itemp, 2
+	.equ xtemp, 1
+	.equ ytemp, 0
+
+startSnake:	BGN# 6
+	;LDA# 10
+	;JSR PUT_NUM
+	LDA# CLEAR_DISPLAY
+	outb CRT_CNTL
+	PSH# seed
+	lda# 28
+	PSHa
+	JSR random2
+	ADS# 2
+	ADA# 5
+	STA ! xtemp
+	PSH# seed
+	lda# 4
+	PSha
+	JSR random2
+	ADS# 2
+	ADA# 5
+	STA ! ytemp
+	MUL# 38
+	ADA ! xtemp
+	STA ! loc
+	psh ! xtemp
+	psh ! ytemp
+	psh HEADCHAR
+	JSR PUTCHAR
+	ADS# 3
+	LDA# 3
+	STA HEAD
+	LDA# 0
+	STA TAIL
+	LDA ! loc
+	LDX# 3
+	STA+ Q
+	LDX# 2
+startsnakeLoop:	LDA Direction
+	CMA# UP
+	JEQ startsnakeU
+	CMA# Down
+	JEQ startsnakeD
+	CMA# LEFT
+	JEQ StartSnakeL
+	CMA# Right
+	JEQ StartSnakeR
+	JMP putsnake
+startsnakeU:	ADX# 1
+	LDA+ Q
+	SBX# 1
+	ADA# 38
+	STA+ Q
+	JMP putsnake
+StartSnakeD:	ADX# 1
+	LDA+ Q
+	SBX# 1
+	SBA# 38
+	STA+ Q
+	JMP putsnake
+STARTSNAKEL:	ADX# 1
+	LDA+ Q
+	SBX# 1
+	ADA# 1
+	STA+ Q
+	JMP PUTSNAKE
+STARTSNAKER:	ADX# 1
+	LDA+ Q
+	SBX# 1
+	SBA# 1
+	STA+ Q
+	JMP PUTSNAKE
+PUTSNAKE:	LDA+ Q
+	MOD 38
+	PSHA
+	LDA+ Q
+	DIV 38
+	PSHA
+	PSH BODY
+	JSR PUTCHAR
+	ADS# 3
+	SOJ StartSnakeLoop
+	LDX# 0
+StartFood:	JSR putFOOD
+	AOC# 4
+	JLE StartFood
+	JMP StartSnakeDone
+
+putFood:	BGN# 0
+	psha
+	pshx
+putFood2:	PSH# SEED
+	psh# 532
+	JSR random2
+	ADS# 2
+	TAX
+	inb+ CRT_BUFFER
+	cma# ' '
+	jeq subputfood
+	jmp putFood2
+;putFoodX:	lda# 37
+;	PSH Seed
+;	Psha
+;	JSR random2
+;	ADS# 2
+;	STA ! x2temp
+;	SBA ! xtemp
+;	CMA# 0
+;	JLT negX	
+;putFoodX2:	CMA# 5
+;	JLT putFoodX
+;putFoodY:	lda# 12
+;	PSH Seed
+;	Psha
+;	JSR random2
+;	ADS# 2
+;	STA ! y2temp
+;	SBA ! ytemp
+;	CMA# 0
+;	JLT negy
+;putFoodY2:	CMA# 5
+;	JLT PutFoodY
+
+;putFoodIf:	;LDA ! x2temp
+	;outb crt_xreg
+	;LDA ! y2temp
+	;outb crt_yreg
+;	LDA ! y2temp
+;	MUL# 38
+;	ADA# x2temp
+;	ADA# crt_BUFFER
+;	STA ! x2temp
+;	inb x2temp
+;	CMA# ' '
+;	JEQ subputfood
+;	CMX# 5
+;	JLE putFOOD
+;	JMP startSnakeDone
+subputfood:	LDA FOOD
+	outb+ CRT_BUFFER
+	popx
+	popa
+	fin# 0
+	rtn
+
+
+
+startSnakeDone:
+	FIN# 6
+	RTN
+	HLT
+
+
+;NEGATION:	BGN# 0
+;	NEGA
+;	FIN# 0
+;	RTN
+
+;negX:	JSR NEGATION
+;	JMP putFoodX2
+;negY:	JSR NEGATION
+;	JMP putFoodY2
 
 
 ;char stuff?
@@ -364,23 +594,28 @@ SEEDPROMPT:	.CHAR 'Seed', SEEDPROMPT_LEN
 SPEED:	.word
 SEED:	.word
 Gameov:	.CHAR '          Game Over', Gameov_Len
+;COUNTTIME:	.word
 QUIT:	.CHAR 'x', QUITLEN
 PAUSETEXT:	.CHAR 'Paused', PAUSE_LEN
 ;NOKKEY: .CHAR '\n', NOKKEYLEN
 KBD_Val:	.word	;direction of snake/other keyboard interrupt values
 ScoreDelay:	.word SCORE_DELAY
-BODY:	.CHAR 'O', BODYLEN
+;BODY:	.CHAR 'O', BODYLEN
+BODY:	.word 'O'
+HEADCHAR:	.word 'O'
 NO_BODY:	.CHAR ' ', NO_BODYLEN
-FOOD:	.CHAR 'F', FOODLEN
+FOOD:	.word 'F'
+;snake:	.blkw, Q_SIZE
+COUNTDOWNTIME:	.word PLAY_DELAY
 CDCOUNT:	.word
 Score:	.word 0
 ScoreText:	.char 'Score: ', ScoreText_Len
 lives:	.word 3
 LivesText:	.char 'Lives: ', LivesText_Len
-direction:	.word
+direction:	.word 4
 delay:	.word
 head:	.word
-STAGE:	.word; 0 = intro, 1 = showScore, 2 = countdown
+STAGE:	.word; 1 = countdown, 2 = CD Done, 3 = gameplay, 5 = pause
 tail:	.word
-Q:	.blkw Q_SIZE, 0
+Q:	.blkw Q_SIZE
 neg_one:	.word -1
