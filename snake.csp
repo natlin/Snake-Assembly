@@ -43,9 +43,9 @@
 	.EQU RIGHT, 5
 	.EQU MAX, 33
 	.EQU Q_SIZE, 600
-	.EQU PLAY_DELAY, 5000
+	.EQU PLAY_DELAY, 2500
 	.EQU SCORE_DELAY, 50000
-	.EQU COUNTDOWN_DELAY, 10000
+	.EQU COUNTDOWN_DELAY, 5000
 
         ;putchar test
 
@@ -187,36 +187,160 @@ KEYDone:	;lda# Interrupt_ENA
 	IRTN
 
 ;getKey:
-	.equ direct, 8
-	.equ scoresCnt, 7
-	.equ livesCnt, 6
-	.equ seedNum, 5
-	.equ snake, 4
-	.equ headptr, 3
-	.equ tailptr, 2
+	.equ direct, 13
+	.equ scoresCnt, 12
+	.equ livesCnt, 11
+	.equ seedNum, 10
+	.equ snake, 9
+	.equ headptr, 8
+	.equ tailptr, 7
+	.equ newloc, 4
+	.equ getcharTMP, 3
+	.equ newx, 2
+	.equ newy, 1
+	.equ OKK, 0
 
-moveSnake:	BGN# 0
+
+moveSnake:	BGN# 5
+	psha
+	pshx
+	ldx* ! headPtr
+	lda& ! snake
+	STA ! newloc
+	lda ! direct
+	CMA# UP
+	JEQ mvSnakeU
+	CMA# DOWN
+	JEQ mvSnakeD
+	CMA# LEFT
+	JEQ mvSnakeL
+	CMA# RIGHT
+	JEQ mvSnakeR
+	JMP mvSnakeEnd
 	
-mvSnakeU:	lda ! headPtr
+mvSnakeU:	lda ! newloc
 	SBA# 38
-	STA ! headPtr
+	STA ! newloc
+	CMA# 0
+	JLT mvSnakeUT
+	LDA# 1
+	STA ! OKK
 	JMP mvSnakeCont
-mvSnakeD:	lda ! headPtr
+mvSnakeUT:	LDA# 0
+	STA ! OKK
+	JMP mvSnakeCont
+
+mvSnakeD:	lda ! newloc
 	ADA# 38
-	STA ! headPtr
+	STA ! newloc
+	CMA# 531
+	JGT mvSnakeUT
+	LDA# 1
+	STA ! OKK
 	JMP mvSnakeCont
-mvSnakeL:	lda ! headPtr
+
+mvSnakeL:	lda ! newloc
 	SBA# 1
-	STA ! headPtr
+	STA ! newloc
+	MOD# 38
+	CMA# 0
+	JEQ mvSnakeUT
+	LDA# 1
+	STA ! OKK
 	JMP mvSnakeCont
-mvSnakeR:	lda ! headPtr
+mvSnakeR:	lda ! newloc
 	ADA# 1
-	STA ! headPtr
+	STA ! newloc
+	MOD# 38
+	CMA# 37
+	JEQ mvSnakeUT
+	LDA# 1
+	STA ! OKK
 	JMP mvSnakeCont
-mvSnakeCont:	LDA# 1
-	JSR PUT_NUM
-	FIN# 0
+mvSnakeCont:	LDA ! OKK
+	CMA# 1
+	JEQ mvSnakeIf
+	HLT ;Decrease Lives, stop timer, go to show score
+mvSnakeIf:	LDA ! newloc
+	MOD# 38
+	STA ! newx
+	LDA ! newloc
+	DIV# 38
+	STA ! newy
+	MUL# 38
+	ADA ! newx
+	ada# CRT_BUFFER
+	sta ! getcharTMP
+	inb ! getcharTMP
+;	pshX
+;	TAX
+;	inb+ $0
+	;popx
+	cma BODY
+	JEQ mvSnakeUT
+	JMP mvSnakeFoodTest
+Foodreturn:	PSH ! newx
+	PSH ! newy
+	PSH BODY
+	JSR putChar
+	ADS# 3
+;	LDA Body
+;	outb getcharTMP
+	lda* ! headPtr
+	ADA# 1
+	STA* ! headPtr
+	CMA Q_SIZE
+	JGE resetHead
+mvSnakeIfRet:	lda ! newloc
+	ldx* ! headPtr
+	STA& ! snake
+	LDA ! OKK
+	CMA# 1
+	JEQ newFOOD
+	ldx* ! tailPtr
+	lda& ! snake
+	mod# 38
+	sta ! newx
+	lda& ! snake
+	div# 38
+	sta ! newy
+	PSH ! newx
+	PSH ! newy
+	PSH# ' '
+	JSR PUTCHAR
+	ADS# 3
+	lda* ! tailPtr
+	ADA# 1
+	STA* ! tailPtr
+	CMA Q_SIZE
+	JGE resetTAIL
+
+
+mvSnakeEnd:	popx
+	popa
+	FIN# 5
 	RTN
+FOODFLAG:	LDA# 1
+	STA ! OKK
+	JMP FOodRETURN
+NOFOODFLAG:	LDA# 0
+	STA ! OKK
+	JMP FOODRETURN
+
+mvSnakeFoodTest:	CMA# 'F'
+	JEQ FOODFLAG
+	JMP NOFOODFLAG
+newFOOD:	INC* ! scoresCNT
+	JSR putFOOD
+	JMP mvSnakeEnd
+
+resetTAIL:	LDA# 0
+	STA* ! TailPTR
+	JMP mvSnakeEnd
+
+resetHead:	LDA# 0
+	STA* ! headPtr
+	JMP mvSnakeIfRET
 
 
 	.EQU	putCharX, 5
@@ -248,8 +372,8 @@ TimerISR:	PSHA
 	JEQ TimCNTDWN
 	CMA# 2
 	JEQ TimStartSnake
-	;CMA# 3
-	;JEQ TimMOVE
+	CMA# 3
+	JEQ TimMOVE
 	JMP TimDone
 TimCNTDWN:	JSR COUNTDOWN
 	JMP TimDone
@@ -272,7 +396,8 @@ TimCNTDWN:	JSR COUNTDOWN
 ;	JMP TimLoop2
 ;TimLoop2:
 TimStartSnake:	JSR StartSnake
-	INC STAGE
+	LDA# 3
+	STA STAGE
 	JMP TimDone
 ;TimLoop1:
 ;TimLoop0:
@@ -427,6 +552,8 @@ GameOver:	lda# 15
 	.equ ytemp, 0
 
 startSnake:	BGN# 6
+	LDA# Play_Delay
+	outw tim_reload
 	;LDA# 10
 	;JSR PUT_NUM
 	LDA# CLEAR_DISPLAY
@@ -606,7 +733,7 @@ HEADCHAR:	.word 'O'
 NO_BODY:	.CHAR ' ', NO_BODYLEN
 FOOD:	.word 'F'
 ;snake:	.blkw, Q_SIZE
-COUNTDOWNTIME:	.word PLAY_DELAY
+COUNTDOWNTIME:	.word Countdown_Delay
 CDCOUNT:	.word
 Score:	.word 0
 ScoreText:	.char 'Score: ', ScoreText_Len
