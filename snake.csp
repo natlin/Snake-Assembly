@@ -44,7 +44,7 @@
 	.EQU RIGHT, 5
 	.EQU MAX, 33
 	.EQU Q_SIZE, 600
-	.EQU PLAY_DELAY, 1500
+	.EQU PLAY_DELAY, 1600
 	.EQU SCORE_DELAY, 25000
 	.EQU COUNTDOWN_DELAY, 5000
 
@@ -155,7 +155,7 @@ keyISR:	PSHA
 	CMA# ' '
 	JEQ	PAUSE
 	CMA#	'x'
-	JNE	KEY1
+	JNE	KEY5
 	HLT		;HALT if X
 
 PAUSE:;	lda# 17
@@ -181,6 +181,26 @@ PAUSE2:	inb KBD_Stat
 	lda# $F0
 	outb tim_cntl;return to game
 
+
+KEY5:	cma# 's'
+	JNE KEY6
+	lda playdelay
+	;CMA# playcomp
+	;JGE KEYDONE
+	ADA# 250
+	STA playDelay
+	outw Tim_Reload
+	JMP KEYDONE
+KEY6:	cma# 'w'
+	JNE KEY1
+	lda playdelay
+	CMA# 250
+	JLE keydone
+	SBA# 250
+	STA playdelay
+	outw Tim_Reload
+	JMP keyDONE
+
 KEY1:	cma# $1B
 	JNE KeyDone
 	inb kbd_data
@@ -197,9 +217,10 @@ KEY3:	cma# $4B;
 	LDA# left
 	JMP RIGHTKEY
 KEY4:	cma# $4D
-	JNE KEYDone
+	JNE KEYDONE
 	lda# right
 	JMP RIGHTKEY
+
 RIGHTKey:	STA direction
 KEYDone:	;lda# Interrupt_ENA
 	;outb KBD_CNTL
@@ -264,8 +285,14 @@ mvSnakeL:	lda ! newloc
 	SBA# 1
 	STA ! newloc
 	MOD# 38
-	CMA# 0
-	JEQ mvSnakeUT
+	CMA# 37
+	JEQ leftreload
+	LDA# 1
+	STA ! OKK
+	JMP mvSnakeCont
+leftreload:	LDA ! newloc
+	ADA# 38
+	STA ! newloc
 	LDA# 1
 	STA ! OKK
 	JMP mvSnakeCont
@@ -273,8 +300,14 @@ mvSnakeR:	lda ! newloc
 	ADA# 1
 	STA ! newloc
 	MOD# 38
-	CMA# 37
-	JEQ mvSnakeUT
+	CMA# 0
+	JEQ rightreload
+	LDA# 1
+	STA ! OKK
+	JMP mvSnakeCont
+rightreload:	LDA ! newloc
+	SBA# 38
+	STA ! newloc
 	LDA# 1
 	STA ! OKK
 	JMP mvSnakeCont
@@ -605,6 +638,7 @@ GameOver:	lda# 15
 
 startSnake:	BGN# 6
 	LDA# Play_Delay
+	STA PlayDelay
 	outw tim_reload
 	;LDA# 10
 	;JSR PUT_NUM
@@ -767,7 +801,7 @@ startSnakeDone:
 
 
 ;char stuff?
-INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\Cr\LF User Chooses Characters of Snake(5pt) Head is a Different Character(5pt)\CR\LF Space Bar pauses (5pt)\CR\LF\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration(5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF High Score(5pt)\CR\LF Save and Load game(5pt)\CR\LF Press Enter to Continue...', INTRO1LEN
+INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\Cr\LF User Chooses Characters of Snake(5pt) Head is a Different Character(5pt)\CR\LF Space Bar pauses (5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LF "w" = Faster\CR\LF "s" = Slower\Cr\LF\CR\LF Press Enter to Continue...', INTRO1LEN
 SPEEDPROMPT:	.CHAR 'Speed for demo (1 = fast, 9 = slow)', SPEEDPROMPT_LEN
 SEEDPROMPT:	.CHAR 'Seed', SEEDPROMPT_LEN
 SPEED:	.word
@@ -794,7 +828,9 @@ lives:	.word 3
 LivesText:	.char 'Lives: ', LivesText_Len
 direction:	.word 4
 delay:	.word
+playdelay:	.word play_delay
 head:	.word
+playcomp:	.word 15000
 STAGE:	.word; 1 = countdown, 2 = CD Done, 3 = gameplay,
 tail:	.word
 Q:	.blkw Q_SIZE
