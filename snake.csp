@@ -32,6 +32,7 @@
 	.EQU PUT_NL, $E06
 	.EQU PUT_NUM2, $E07
 	.EQU PUT_CHR, $E08
+	.EQU GET_STR, $E04
 
 	.EQU TOP, 0
 	.EQU BOTTOM, 13
@@ -43,8 +44,8 @@
 	.EQU RIGHT, 5
 	.EQU MAX, 33
 	.EQU Q_SIZE, 600
-	.EQU PLAY_DELAY, 2500
-	.EQU SCORE_DELAY, 50000
+	.EQU PLAY_DELAY, 1500
+	.EQU SCORE_DELAY, 25000
 	.EQU COUNTDOWN_DELAY, 5000
 
         ;putchar test
@@ -76,8 +77,21 @@ MAIN:	LDS# $e00
 	JSR SHOWINTRO	;explains options and clears screen
 	lda# clear_display
 	outb crt_cntl
-	psh score
+	PSH# BODYPROMPT_LEN
+	PSH# BODYPROMPT
+	JSR PUT_STR
+	ADS# 2
+	JSR GET_NUM
+	STA BODY
+	SBA# 32
+	STA HEADCHAR
+	lda# clear_display
+	outb crt_cntl
+	LDA# 0
+	outb CRT_xreg
+	outb CRT_yreg
 	psh lives
+	psh score
 	jsr showScore
 	ADS# 2
 	LDA# keyISR
@@ -124,7 +138,10 @@ COUNTDOWN1:	INB TIM_STAT
 	outb CRT_xreg
 	outb CRT_yreg
 	JMP COUNTDOWN1
-COUNTDOWNDONE:	LDA# 2
+COUNTDOWNDONE:	LDA# 0
+	outb CRT_xreg
+	outb CRT_yreg
+	LDA# 2
 	STA STAGE
 	FIN# 1
 	RTN
@@ -141,25 +158,28 @@ keyISR:	PSHA
 	JNE	KEY1
 	HLT		;HALT if X
 
-PAUSE:	lda# 17
-	outb crt_xreg
-	lda# 7
-	outb crt_yreg
-	PSH# PAUSE_LEN
-	PSH# PAUSETEXT
-	JSR PUT_STR
-	ADS# 2;display pause screen text
-	lda# 0
-	outb crt_xreg
-	lda# 0
-	outb crt_yreg
+PAUSE:;	lda# 17
+	lda# $20
+	outb tim_cntl
+;	outb crt_xreg
+;	lda# 7
+;	outb crt_yreg
+;	PSH# PAUSE_LEN
+;	PSH# PAUSETEXT
+;	JSR PUT_STR
+;	ADS# 2;display pause screen text
+;	lda# 0
+;	outb crt_xreg
+;	lda# 0
+;	outb crt_yreg
 PAUSE2:	inb KBD_Stat
 	cma# $80
 	JLT PAUSE2
 	inb KBD_Data
 	cma# ' '
 	JNE PAUSE
-	;return to game
+	lda# $F0
+	outb tim_cntl;return to game
 
 KEY1:	cma# $1B
 	JNE KeyDone
@@ -206,6 +226,7 @@ moveSnake:	BGN# 5
 	pshx
 	ldx* ! headPtr
 	lda& ! snake
+	STA ! getcharTMP
 	STA ! newloc
 	lda ! direct
 	CMA# UP
@@ -260,7 +281,10 @@ mvSnakeR:	lda ! newloc
 mvSnakeCont:	LDA ! OKK
 	CMA# 1
 	JEQ mvSnakeIf
-	HLT ;Decrease Lives, stop timer, go to show score
+	DEC* ! livesCNT
+	LDA# 4
+	STA STAGE
+	JMP mvSnakeEnd ;Decrease Lives, stop timer, go to show score
 mvSnakeIf:	LDA ! newloc
 	MOD# 38
 	STA ! newx
@@ -270,20 +294,31 @@ mvSnakeIf:	LDA ! newloc
 	MUL# 38
 	ADA ! newx
 	ada# CRT_BUFFER
-	sta ! getcharTMP
-	inb ! getcharTMP
+	;sta ! getcharTMP
+	;inb* ! getcharTMP
 ;	pshX
-;	TAX
-;	inb+ $0
+	TAX
+	inb+ $0
 	;popx
 	cma BODY
 	JEQ mvSnakeUT
 	JMP mvSnakeFoodTest
 Foodreturn:	PSH ! newx
 	PSH ! newy
-	PSH BODY
+	PSH HEADCHAR
 	JSR putChar
 	ADS# 3
+	LDA ! getcharTMP
+	MOD# 38
+	STA ! newx
+	LDA ! getcharTMP
+	DIV# 38
+	STA ! newy
+	PSH ! newx
+	PSH ! newy
+	PSH BODY
+	JSR putCHAR
+	ADS#3
 ;	LDA Body
 ;	outb getcharTMP
 	lda* ! headPtr
@@ -374,13 +409,24 @@ TimerISR:	PSHA
 	JEQ TimStartSnake
 	CMA# 3
 	JEQ TimMOVE
+	CMA# 4
+	JEQ TimScore
 	JMP TimDone
-TimCNTDWN:	JSR COUNTDOWN
+TimCNTDWN:	LDA COUNTDOWNTIME
+	outw Tim_Reload
+	JSR COUNTDOWN
 	JMP TimDone
 ;	LDA CDCOUNT
 ;	CMA# neg_one
 ;	JNE COUNTDOWNTXT
 ;	JMP STARTSNAKE
+TimScore:	LDA ScoreDelay
+	outw Tim_Reload
+	PSH Lives
+	PSH Score
+	JSR ShowScore
+	ADS# 2
+	JMP TimDone
 ;COUNTDOWNTXT:	ada# '0'
 ;	outb $113
 ;	dec CDCOUNT
@@ -440,6 +486,9 @@ showIntro:	BGN# 0
 	psh# intro1
 	jsr put_str
 	ads# 2
+	LDA# 0
+	outb CRT_xreg
+	outb CRT_yreg
 showIntro1:	inb KBD_Stat
 	cma# $80	;ready bit set?
 	JLT showIntro1
@@ -451,9 +500,8 @@ showIntro1:	inb KBD_Stat
 	;write interrupt to read a key to clear screen and go to countdown
 	RTN
 
-
-	.equ score1, 3
-	.equ lives1, 2
+	.equ lives1, 3
+	.equ score1, 2
 
 showScore:	BGN# 0
 		psha
@@ -491,6 +539,8 @@ showScoreText:	lda# 15
 showScoreEnd:	;JSR COUNTDOWN
 	;LDA# 3
 	;STA CDCOUNT
+	lda# 0
+	outb crt_yreg
 	LDA# 1
 	STA STAGE
 	popa
@@ -505,7 +555,7 @@ GameOver:	lda# 15
 		psh# ScoreText
 		JSR Put_Str
 		ads# 2
-		LDA Score
+		LDA ! Score1
 		JSR PUT_NUM
 		lda# 15
 		outb crt_xreg
@@ -515,7 +565,7 @@ GameOver:	lda# 15
 		psh# LivesText
 		JSR Put_str
 		ADS# 2
-		LDA Lives
+		LDA ! Lives1
 		JSR PUT_NUM
 	lda# 3
 	outb crt_yreg
@@ -523,6 +573,8 @@ GameOver:	lda# 15
 	psh# Gameov
 	JSR Put_str
 	ads# 2
+	lda# 0
+	outb crt_yreg
 	HLT
 	JMP showScoreEnd
 
@@ -715,12 +767,12 @@ startSnakeDone:
 
 
 ;char stuff?
-INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\CR\LF Head is diff character (5pt)\CR\LF Space Bar pauses (5pt)\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration (5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF Choose Characters of Snake(5pt)\CR\LF High Score (5pt)\CR\LF Save and Load game (5pt)\CR\LF Press Enter to Continue...', INTRO1LEN
+INTRO1:	.CHAR 'SNAKE: (ASCII art?) \CR\LF OPTIONS:\Cr\LF User Chooses Characters of Snake(5pt) Head is a Different Character(5pt)\CR\LF Space Bar pauses (5pt)\CR\LF\CR\LF Increase/Decrease Speed\CR\LF of Snake Button (5pt)\CR\LFSpeed based on duration(5pt)\CR\LF Horizontal Wrap-around(5pt)\CR\LF High Score(5pt)\CR\LF Save and Load game(5pt)\CR\LF Press Enter to Continue...', INTRO1LEN
 SPEEDPROMPT:	.CHAR 'Speed for demo (1 = fast, 9 = slow)', SPEEDPROMPT_LEN
 SEEDPROMPT:	.CHAR 'Seed', SEEDPROMPT_LEN
 SPEED:	.word
 SEED:	.word
-Gameov:	.CHAR '          Game Over', Gameov_Len
+Gameov:	.CHAR '              Game Over', Gameov_Len
 ;COUNTTIME:	.word
 QUIT:	.CHAR 'x', QUITLEN
 PAUSETEXT:	.CHAR 'Paused', PAUSE_LEN
@@ -728,6 +780,7 @@ PAUSETEXT:	.CHAR 'Paused', PAUSE_LEN
 KBD_Val:	.word	;direction of snake/other keyboard interrupt values
 ScoreDelay:	.word SCORE_DELAY
 ;BODY:	.CHAR 'O', BODYLEN
+BODYPROMPT:	.CHAR '   a:97     b:98     c:99     d:100\Cr\LF   e:101    f:N/A    g:103    h:104\Cr\LF   i:105    j:106    k:107    l:108\Cr\LF   m:109    n:110    o:111    p:112\CR\LF   q:113    r:114    s:115    t:116\Cr\LF   u:117    v:118    w:119    x:120\Cr\LF   y:121    z:122\Cr\LF\Cr\LFInput ASCII Value in Decimal\CR\LFFor Snake Body(except 102)', BodyPrompt_Len
 BODY:	.word 'O'
 HEADCHAR:	.word 'O'
 NO_BODY:	.CHAR ' ', NO_BODYLEN
@@ -742,7 +795,7 @@ LivesText:	.char 'Lives: ', LivesText_Len
 direction:	.word 4
 delay:	.word
 head:	.word
-STAGE:	.word; 1 = countdown, 2 = CD Done, 3 = gameplay, 5 = pause
+STAGE:	.word; 1 = countdown, 2 = CD Done, 3 = gameplay,
 tail:	.word
 Q:	.blkw Q_SIZE
 neg_one:	.word -1
