@@ -1,90 +1,230 @@
 LINE ADDR CONTENTS SOURCE LINE
   1.              ;Authors Nathan Lin, Matthew Yap
   2.              
-  3.              	.EQU TDR_CNTL, $020
-  4.              	.EQU TDR_STAT, $020
-  5.              	.EQU TDR_LEN, $021
-  6.              	.EQU TDR_ADDR, $022
+  3.              
+  4.              .EQU TDR_CNTL, $020
+  5.              
+  6.              .EQU TDR_STAT, $020
   7.              
-  8.              	.EQU READ_BITS, $10
-  9.              	.EQU MOUNTED_BIT, $20
- 10.              	.EQU EOT_BIT, $08
+  8.              .EQU TDR_LEN, $021
+  9.              
+ 10.              .EQU TDR_ADDR, $022
  11.              
- 12.              	.EQU CRT_CNTL, $316
- 13.              	.EQU CRT_DATA, $317
+ 12.              
+ 13.              .EQU READ_BITS, $10
  14.              
- 15.              	.EQU NEXT_LINE_VALUE, $0D
+ 15.              .EQU MOUNTED_BIT, $20
  16.              
- 17.  000 020E00  	LDS# $E00
+ 17.              .EQU EOT_BIT, $08
  18.              
- 19.  001 702020  MAIN:	INB TDR_STAT	; CHECK FOR TAPE DRIVE READY
- 20.  002 4B2028  	JGE STOP
- 21.  003 000029  	LDA# BUFFER	; LOAD TRANSFER ADDRESS
- 22.  004 732022  	OUTW TDR_ADDR
- 23.  005 00001E  NEXT_REC:	LDA# B_SIZE	; LOAD TRANSFER LENGTH
- 24.  006 712021  	OUTB TDR_LEN
- 25.  007 000010  	LDA# READ_BITS	; INITIATE READ
- 26.  008 712020  	OUTB TDR_CNTL
- 27.  009 702020  POLL:	INB TDR_STAT	; WAIT FOR OPERATION COMPLETE
- 28.  00A 4A200E  	JLT COMPLETE
- 29.  00B 300020  	AND# MOUNTED_BIT	; CHECK THAT TAPE STILL MOUNTED
- 30.  00C 482028  	JEQ STOP	; IF NOT, AN ERROR HAS OCCURRED
- 31.  00D 402009  	JMP POLL
- 32.  00E 300008  COMPLETE:	AND# EOT_BIT	; CHECK FOR END OF TAPE
- 33.  00F 492028  	JNE STOP
- 34.  010 702021  	INB TDR_LEN	; GET TRANSFER LENGTH
- 35.  011 482020  	JEQ NEW_LINE	; IF ZERO, SKIP DATA OUTPUT
- 36.  012 042033  	STA COUNT	; INITIALIZE COUNTER COUNT
- 37.  013 010000  	LDX# 0
- 38.              ;COPY_CHAR:	LDC BUFFER	; GET CHARACTER
- 39.              ;	OUTB CRT_DATA	; COPY TO SCREEN
- 40.              ;	AOC COUNT	; LOOP BACK IF NOT DONE
- 41.              ;	JLT COPY_CHAR
+ 19.              
+ 20.              .EQU CRT_CNTL, $316
+ 21.              
+ 22.              .EQU CRT_DATA, $317
+ 23.              
+ 24.              
+ 25.              .EQU NEXT_LINE_VALUE, $0D
+ 26.              
+ 27.              
+ 28.  000 020E00  LDS# $E00
+ 29.              
+ 30.              
+ 31.  001 702020  MAIN: INB TDR_STAT ; CHECK FOR TAPE DRIVE READY
+ 32.              
+ 33.  002 4B202C  JGE STOP2
+ 34.              
+ 35.  003 000048  LDA# BUFFER ; LOAD TRANSFER ADDRESS
+ 36.              
+ 37.  004 732022  OUTW TDR_ADDR
+ 38.              
+ 39.  005 00001E  NEXT_REC: LDA# B_SIZE ; LOAD TRANSFER LENGTH
+ 40.              
+ 41.  006 712021  OUTB TDR_LEN
  42.              
- 43.              ;	.EQU CHAR, 2	;FORMAL PARAMETER
- 44.              	.EQU PRT_STAT, $010
- 45.              	.EQU PRT_DATA, $011
- 46.              	.EQU ON_LINE_BIT, $020
- 47.              
- 48.              ;PRINT:	BGN# 0	; INIT. CALL
- 49.  014 702010  LOOP:	INB PRT_STAT	; GET PRINTER STATUS
- 50.  015 4A201A  	JLT READY	; IF PRINTER IS READY, PRINT CHAR.
- 51.  016 300020  	AND# ON_LINE_BIT
- 52.  017 492014  	JNE LOOP
- 53.  018 000001  OFF_LINE:	LDA# 1	; ACC = 1 TO INDICATE FAILURE
- 54.  019 402020  	JMP NEW_LINE
- 55.  01A 502029  READY:	LDC BUFFER	; GET CHARACTER AND
- 56.  01B 712011  	OUTB PRT_DATA	; PRINT IT
- 57.  01C 602033  	AOC COUNT
- 58.  01D 4A2014  	JLT LOOP
- 59.  01E 000000  	LDA# 0	; ACC = 0 TO INDICATE SUCCESS
- 60.  01F 402020  	JMP NEW_LINE
- 61.              ;DONE:	FIN# 0	; CLOSE CALL
- 62.              ;	RTN
- 63.              
- 64.              NEW_LINE:	
- 65.  020 702010  LOOP2:	INB PRT_STAT
- 66.  021 4A2024  	JLT NEW_LINE2
- 67.  022 300020  	AND# ON_LINE_BIT
- 68.  023 492020  	JNE LOOP2
- 69.  024 00000D  NEW_LINE2:	LDA# NEXT_LINE_VALUE	; MOVE CURSOR TO NEXT LINE
- 70.  025 712011  	OUTB PRT_DATA
- 71.  026 402005  	JMP NEXT_REC
- 72.  027 4820E0  	jeq $E0
- 73.  028 FFFFFF  STOP:	HLT
+ 43.  007 000010  LDA# READ_BITS ; INITIATE READ
+ 44.              
+ 45.  008 712020  OUTB TDR_CNTL
+ 46.              
+ 47.  009 702020  POLL: INB TDR_STAT ; WAIT FOR OPERATION COMPLETE
+ 48.              
+ 49.  00A 4A200E  JLT COMPLETE
+ 50.              
+ 51.  00B 300020  AND# MOUNTED_BIT ; CHECK THAT TAPE STILL MOUNTED
+ 52.              
+ 53.  00C 482028  JEQ STOP ; IF NOT, AN ERROR HAS OCCURRED
+ 54.              
+ 55.  00D 402009  JMP POLL
+ 56.              
+ 57.  00E 300008  COMPLETE: AND# EOT_BIT ; CHECK FOR END OF TAPE
+ 58.              
+ 59.  00F 492028  JNE STOP
+ 60.              
+ 61.  010 702021  INB TDR_LEN ; GET TRANSFER LENGTH
+ 62.              
+ 63.  011 482020  JEQ NEW_LINE ; IF ZERO, SKIP DATA OUTPUT
+ 64.              
+ 65.  012 042052  STA COUNT ; INITIALIZE COUNTER COUNT
+ 66.              
+ 67.  013 010000  LDX# 0
+ 68.              
+ 69.              ;COPY_CHAR: LDC BUFFER ; GET CHARACTER
+ 70.              
+ 71.              ; OUTB CRT_DATA ; COPY TO SCREEN
+ 72.              
+ 73.              ; AOC COUNT ; LOOP BACK IF NOT DONE
  74.              
- 75.              	.EQU B_SIZE, 30	; MAX CHARACTERS PER RECORD
- 76.  029 FFFFFFFFFFFFFFFF  BUFFER:	.BLKW (B_SIZE+2)/3	; BUFFER LENGTH IS ROUNDED UP
- 77.  033 FFFFFFFFFFFFFFFF  COUNT:	.BLKW 1
+ 75.              ; JLT COPY_CHAR
+ 76.              
+ 77.              
+ 78.              ; .EQU CHAR, 2 ;FORMAL PARAMETER
+ 79.              
+ 80.              .EQU PRT_STAT, $010
+ 81.              
+ 82.              .EQU PRT_DATA, $011
+ 83.              
+ 84.              .EQU ON_LINE_BIT, $020
+ 85.              
+ 86.              
+ 87.              ;PRINT: BGN# 0 ; INIT. CALL
+ 88.              
+ 89.  014 702010  LOOP: INB PRT_STAT ; GET PRINTER STATUS
+ 90.              
+ 91.  015 4A201A  JLT READY ; IF PRINTER IS READY, PRINT CHAR.
+ 92.              
+ 93.  016 300020  AND# ON_LINE_BIT
+ 94.              
+ 95.  017 492014  JNE LOOP
+ 96.              
+ 97.  018 000001  OFF_LINE: LDA# 1 ; ACC = 1 TO INDICATE FAILURE
+ 98.              
+ 99.  019 402020  JMP NEW_LINE
+100.              
+101.  01A 502048  READY: LDC BUFFER ; GET CHARACTER AND
+102.              
+103.  01B 712011  OUTB PRT_DATA ; PRINT IT
+104.              
+105.  01C 602052  AOC COUNT
+106.              
+107.  01D 4A2014  JLT LOOP
+108.              
+109.  01E 000000  LDA# 0 ; ACC = 0 TO INDICATE SUCCESS
+110.              
+111.  01F 402020  JMP NEW_LINE
+112.              
+113.              ;DONE: FIN# 0 ; CLOSE CALL
+114.              
+115.              ; RTN
+116.              
+117.              
+118.              NEW_LINE:
+119.              
+120.  020 702010  LOOP2: INB PRT_STAT
+121.              
+122.  021 4A2024  JLT NEW_LINE2
+123.              
+124.  022 300020  AND# ON_LINE_BIT
+125.              
+126.  023 492020  JNE LOOP2
+127.              
+128.  024 00000D  NEW_LINE2: LDA# NEXT_LINE_VALUE ; MOVE CURSOR TO NEXT LINE
+129.              
+130.  025 712011  OUTB PRT_DATA
+131.              
+132.  026 402005  JMP NEXT_REC
+133.              
+134.  027 4820E0  jeq $E0
+135.              
+136.  028 702010  STOP: INB PRT_STAT
+137.              
+138.  029 300020  AND# $20
+139.              
+140.  02A 48203D  JEQ p_offline
+141.              
+142.  02B FFFFFF  HLT
+143.              
+144.              STOP2:
+145.  02C 0A2054  clr loopcnter
+146.              
+147.  02D 080016   PSH# TAPEOFFLINELEN
+148.              
+149.  02E 080055  PSH# TAPEOFFLINE
+150.              
+151.  02F 412E05  JSR $E05
+152.              
+153.  030 120002  ADS# 2
+154.  031 000000  	LDA# 0
+155.  032 712314  	outb $314
+156.  033 712315  	outb $315
+157.              NOPLOOP:
+158.  034 FFF038  	NOP
+159.  035 1B2054  	INC loopcnter
+160.  036 002054  	LDA loopcnter
+161.  037 202053  	CMA LOOPCNT
+162.  038 4A2034  	JLT NOPLOOP
+163.              
+164.              
+165.  039 702010  INB PRT_STAT
+166.              
+167.  03A 300020  AND# $20
+168.              
+169.  03B 48203D  JEQ p_offline
+170.              
+171.  03C 402028  JMP STOP
+172.              
+173.              p_offline:
+174.  03D 000001  	LDA# 1
+175.  03E 712314  	outb $314
+176.  03F 712315  	outb $315
+177.  040 080015   PSH# PRINTEROFFLINELEN
+178.              
+179.  041 08005D  PSH# PRINTEROFFLINE
+180.              
+181.  042 412E05  JSR $E05
+182.              
+183.  043 120002  ADS# 2
+184.  044 000000  	LDA# 0
+185.  045 712314  	outb $314
+186.  046 712315  	outb $315
+187.  047 FFFFFF  HLT
+188.              
+189.              .EQU B_SIZE, 30 ; MAX CHARACTERS PER RECORD
+190.              
+191.  048 FFFFFFFFFFFFFFFF  BUFFER: .BLKW (B_SIZE+2)/3 ; BUFFER LENGTH IS ROUNDED UP
+192.              
+193.  052 FFFFFFFFFFFFFFFF  COUNT: .BLKW 1
+194.              
+195.  053 0003E8  LOOPCNT: .word 1000
+196.  054 000000  LOOPCNTER: .word 0
+197.              
+198.  055 546170  TAPEOFFLINE: .CHAR 'Tape is not mounted. \CR', TAPEOFFLINELEN
+      056 652069
+      057 73206E
+      058 6F7420
+      059 6D6F75
+      05A 6E7465
+      05B 642E20
+      05C 0D2020
+199.              
+200.  05D 507269  PRINTEROFFLINE: .CHAR 'Printer is offline. \CR', PRINTEROFFLINELEN
+      05E 6E7465
+      05F 722069
+      060 73206F
+      061 66666C
+      062 696E65
+      063 2E200D
+      064 FFFFFFFFFFFFFFFF
 
                      SYMBOL TABLE CONTENTS
 
-000029 = BUFFER          00001E = B_SIZE          00000E = COMPLETE        
-000033 = COUNT           000316 = CRT_CNTL        000317 = CRT_DATA        
+000048 = BUFFER          00001E = B_SIZE          00000E = COMPLETE        
+000052 = COUNT           000316 = CRT_CNTL        000317 = CRT_DATA        
 000008 = EOT_BIT         000014 = LOOP            000020 = LOOP2           
-000001 = MAIN            000020 = MOUNTED_BIT     000020 = NEW_LINE        
-000024 = NEW_LINE2       00000D = NEXT_LINE_VALUE 000005 = NEXT_REC        
+000053 = LOOPCNT         000054 = LOOPCNTER       000001 = MAIN            
+000020 = MOUNTED_BIT     000020 = NEW_LINE        000024 = NEW_LINE2       
+00000D = NEXT_LINE_VALUE 000005 = NEXT_REC        000034 = NOPLOOP         
 000018 = OFF_LINE        000020 = ON_LINE_BIT     000009 = POLL            
-000011 = PRT_DATA        000010 = PRT_STAT        00001A = READY           
-000010 = READ_BITS       000028 = STOP            000022 = TDR_ADDR        
+00005D = PRINTEROFFLINE  000015 = PRINTEROFFLINELEN000011 = PRT_DATA        
+000010 = PRT_STAT        00003D = P_OFFLINE       00001A = READY           
+000010 = READ_BITS       000028 = STOP            00002C = STOP2           
+000055 = TAPEOFFLINE     000016 = TAPEOFFLINELEN  000022 = TDR_ADDR        
 000020 = TDR_CNTL        000021 = TDR_LEN         000020 = TDR_STAT        
